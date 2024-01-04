@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Conversational Interview Bot</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            background-color: #f4f4f8;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+
+        .container {
+            text-align: center;
+            background-color: #fff;
+            padding: 40px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            border-radius: 8px;
+        }
+
+        header {
+            font-size: 24px;
+            color: #333;
+            margin-bottom: 20px;
+        }
+
+        button {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            margin: 10px;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        button:hover,
+        button:active {
+            background-color: #397d35;
+        }
+
+        .mic-status {
+            margin-top: 15px;
+            font-size: 18px;
+            color: #333;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container">
+        <header>Conversational Interview Bot</header>
+        <button id="startInterview">Start Interview</button>
+        <div class="mic-status" id="micStatus">Microphone is muted</div>
+    </div>
+    <script>
+        let mediaRecorder;
+        let audioChunks = [];
+        let isMicActive = false;
+
+        const updateMicStatus = statusText => {
+            document.getElementById('micStatus').textContent = statusText;
+        };
+
+        const uploadAudio = audioBlob => {
+            let formData = new FormData();
+            formData.append('audio', audioBlob, 'answer.wav');
+
+            fetch('/upload-audio', {
+                method: 'POST',
+                body: formData
+            }).then(response => {
+                if (response.ok) {
+                    console.log('Audio uploaded successfully');
+                } else {
+                    console.error('Upload error:', response.statusText);
+                }
+            }).catch(error => {
+                console.error('Upload error:', error);
+            });
+        };
+
+        const stopRecording = () => {
+            mediaRecorder.stop();
+            mediaRecorder.onstop = () => {
+                const audioBlob = new Blob(audioChunks, { 'type': 'audio/wav' });
+                uploadAudio(audioBlob);
+                isMicActive = false;
+                updateMicStatus('Microphone is muted');
+            };
+            mediaRecorder.stream.getTracks().forEach(track => track.stop());
+        };
+
+        document.getElementById('startInterview').addEventListener('click', function () {
+            this.disabled = true;
+            const questionAudio = new Audio('/get-question');
+            questionAudio.play();
+            updateMicStatus('Playing question...');
+
+            questionAudio.onended = () => {
+                navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
+                    mediaRecorder = new MediaRecorder(stream);
+                    mediaRecorder.ondataavailable = event => {
+                        audioChunks.push(event.data);
+                    };
+                    mediaRecorder.start();
+                    isMicActive = true;
+                    updateMicStatus('Microphone is active');
+                }).catch(error => {
+                    console.error('Error accessing media devices:', error);
+                    updateMicStatus('Microphone access error');
+                });
+
+                setTimeout(stopRecording, 2000); // Auto-stop after a delay (for example, 2 seconds)
+            };
+        });
+    </script>
+</body>
+
+</html>
