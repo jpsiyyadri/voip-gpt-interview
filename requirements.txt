@@ -1,0 +1,2 @@
+fastapi[all]==0.104.1
+uvicorn

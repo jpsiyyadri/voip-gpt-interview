@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>My FastAPI Template Page</title>
+</head>
+
+<body>
+    <h1>{{ message }}</h1>
+    <form id="audioForm" action="/upload-audio" method="post" enctype="multipart/form-data">
+        <input type="hidden" name="session_id" value="{{ session_id }}">
+        <button type="button" id="recordButton">Record Audio</button>
+        <input type="submit" value="Submit Recording" style="display: none;" id="submitBtn">
+    </form>
+    <button type="button" id="playButton">Play Audio</button>
+
+</body>
+
+<script>
+    const recordButton = document.getElementById('recordButton');
+    const submitBtn = document.getElementById('submitBtn');
+    const audioForm = document.getElementById('audioForm');
+    let mediaRecorder;
+    let audioChunks = [];
+
+    recordButton.addEventListener('click', () => {
+        if (!mediaRecorder || mediaRecorder.state === 'inactive') {
+            navigator.mediaDevices.getUserMedia({ audio: true })
+                .then(stream => {
+                    mediaRecorder = new MediaRecorder(stream);
+                    mediaRecorder.ondataavailable = e => {
+                        audioChunks.push(e.data);
+                        if (mediaRecorder.state === 'inactive') {
+                            let audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+                            appendAudioToForm(audioBlob);
+                        }
+                    };
+                    mediaRecorder.start();
+                    recordButton.textContent = 'Stop Recording';
+                    audioChunks = [];
+                });
+        } else {
+            mediaRecorder.stop();
+            recordButton.textContent = 'Record Audio';
+        }
+    });
+
+    function appendAudioToForm(blob) {
+        let audioData = new FormData(audioForm);
+        audioData.append('audio', blob, 'audio.wav');
+        submitFormWithData(audioData);
+    }
+
+    function submitFormWithData(formData) {
+        fetch('/upload-audio', { method: 'POST', body: formData })
+            .then(response => response.json())
+            .then(data => console.log(data));
+    }
+
+    const playButton = document.getElementById('playButton');
+
+    playButton.addEventListener('click', () => {
+        fetchAudioAndPlay('{{ session_id }}');
+    });
+
+
+
+    function fetchAudioAndPlay(sessionId) {
+        fetch(`/get-audio/${sessionId}`)
+            .then(response => response.blob())
+            .then(blob => {
+                const audioUrl = URL.createObjectURL(blob);
+                let newAudio = new Audio(audioUrl);
+                newAudio.play();
+            })
+            .catch(error => console.error('Error fetching audio:', error));
+    }
+</script>
+
+
+</html>
